@@ -3,17 +3,19 @@ import { SourceAttribution, AttributionSection, AttributionSource } from '@/type
 // System prompt for source attribution analysis
 const ATTRIBUTION_SYSTEM_PROMPT = `You are a clinical AI assistant specializing in **source attribution analysis** for pharmacist care plans.
 
-Your task is to analyze a generated care plan and map each statement back to specific snippets from the original patient record.
+Your task is to identify which care plan statements are directly supported by the patient record, and which are clinical inferences or standard recommendations.
 
 ### INSTRUCTIONS
 1. **Parse the care plan** into its main sections (Problem List, SMART Goals, Interventions, Monitoring)
-2. **For each statement** in the care plan, identify which parts of the patient record support or justify that statement
-3. **Extract exact quotes** or paraphrases from the patient record that relate to each care plan statement
-4. **Be precise** - only include sources that directly support the statement
-5. **Format your response** as structured JSON matching the required schema
+2. **For each statement**, determine if it has a direct source in the patient record:
+   - **HAS SOURCE**: Statement is directly supported by specific patient data (medications, vitals, lab values, symptoms, etc.)
+   - **NO SOURCE**: Statement is a clinical inference, standard recommendation, or general medical knowledge
+3. **Only map statements that have clear sources** - skip generic recommendations and clinical inferences
+4. **Extract exact quotes** or paraphrases from the patient record that directly support the statement
+5. **Be selective** - focus on statements that are clearly derived from patient-specific data
 
 ### OUTPUT FORMAT
-Return a JSON object with this exact structure:
+Return ONLY a valid JSON object with this exact structure. Do not include any text before or after the JSON:
 {
   "sections": [
     {
@@ -31,11 +33,15 @@ Return a JSON object with this exact structure:
   ]
 }
 
-### IMPORTANT
-- Use exact text from the patient record when possible
-- If a statement has no clear source, include "No specific source found in patient record"
-- Be thorough but concise
-- Focus on clinical relevance and accuracy`;
+### CRITICAL JSON REQUIREMENTS
+- Return ONLY valid JSON - no markdown, no explanations, no extra text
+- Ensure all strings are properly quoted and escaped
+- Make sure all brackets and braces are properly closed
+- Keep responses concise to avoid truncation
+- **ONLY include statements that have clear sources in the patient record**
+- **Skip statements that are generic recommendations or clinical inferences**
+- Focus on patient-specific data that directly supports the statement
+- If a statement has no clear source, DO NOT include it in the attribution`;
 
 // Build the user prompt for attribution analysis
 const buildAttributionPrompt = (carePlanText: string, patientRecordText: string): string => {
@@ -46,7 +52,7 @@ ${carePlanText}
 ${patientRecordText}
 
 ### TASK:
-Analyze the care plan above and map each statement back to supporting evidence from the patient record. Return your analysis as structured JSON following the format specified in the system prompt.`;
+Analyze the care plan above and identify ONLY the statements that are directly supported by specific data in the patient record. Skip generic recommendations, clinical inferences, and standard medical advice. Focus on statements that clearly derive from patient-specific information like medications, vitals, lab values, or documented symptoms. Return your analysis as structured JSON following the format specified in the system prompt.`;
 };
 
 // Generate source attribution using OpenRouter API
@@ -80,7 +86,7 @@ export const generateSourceAttribution = async (
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.1,
-        max_tokens: 3000
+        max_tokens: 4000
       })
     });
 
@@ -110,9 +116,37 @@ export const generateSourceAttribution = async (
     // Parse the JSON response
     let attributionData: SourceAttribution;
     try {
+      // Clean the response text
+      let jsonText = attributionText.trim();
+      
+      // Remove any markdown code blocks
+      jsonText = jsonText.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+      
       // Extract JSON from the response (in case there's extra text)
-      const jsonMatch = attributionText.match(/\{[\s\S]*\}/);
-      const jsonText = jsonMatch ? jsonMatch[0] : attributionText;
+      const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        jsonText = jsonMatch[0];
+      }
+      
+      // Try to fix common JSON issues
+      jsonText = jsonText.trim();
+      
+      // If the JSON is incomplete, try to fix it
+      if (!jsonText.endsWith('}')) {
+        // Find the last complete statement and close the JSON
+        const lastCompleteStatement = jsonText.lastIndexOf('}');
+        if (lastCompleteStatement > 0) {
+          // Try to close the JSON structure
+          const beforeLastStatement = jsonText.substring(0, lastCompleteStatement + 1);
+          const afterLastStatement = jsonText.substring(lastCompleteStatement + 1);
+          
+          // If there's incomplete content after the last complete statement, try to close it
+          if (afterLastStatement.trim()) {
+            // Try to close the current statement and the JSON
+            jsonText = beforeLastStatement + ']}]}';
+          }
+        }
+      }
       
       const parsed = JSON.parse(jsonText);
       
@@ -130,7 +164,26 @@ export const generateSourceAttribution = async (
     } catch (parseError) {
       console.error('Error parsing attribution JSON:', parseError);
       console.error('Raw attribution response:', attributionText);
-      throw new Error('Failed to parse attribution response as JSON');
+      
+      // If JSON parsing fails, create a fallback structure
+      console.log('Creating fallback attribution structure...');
+      attributionData = {
+        sections: [
+          {
+            section: "Attribution Analysis Unavailable",
+            statements: [
+              {
+                statement: "Source attribution could not be generated due to technical issues",
+                sources: ["LLM response was incomplete or malformed - manual review recommended"]
+              }
+            ]
+          }
+        ],
+        generated_at: new Date().toISOString(),
+        model_used: 'openai/gpt-oss-20b:free'
+      };
+      
+      console.log('Using fallback attribution data:', JSON.stringify(attributionData, null, 2));
     }
 
     console.log('Successfully generated source attribution via OpenRouter API');
