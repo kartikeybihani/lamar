@@ -55,7 +55,7 @@ const generateAttributionWithChunking = async (
   patientRecordText: string, 
   apiKey: string
 ): Promise<SourceAttribution> => {
-  const carePlanChunks = chunkText(carePlanText, 1000); // Smaller chunks
+  const carePlanChunks = chunkText(carePlanText, 2000); // Larger chunks
   const allSections: AttributionSection[] = [];
   
   console.log(`Processing ${carePlanChunks.length} chunks for large care plan...`);
@@ -85,7 +85,7 @@ const generateAttributionWithChunking = async (
             { role: 'user', content: userPrompt }
           ],
           temperature: 0.1,
-          max_tokens: 1500 // Much smaller for chunks
+          max_tokens: 3000 // Reasonable for chunks
         })
       });
 
@@ -156,8 +156,8 @@ export const generateSourceAttribution = async (
   
   console.log(`Token estimation - System: ${systemTokens}, Care Plan: ${carePlanTokens}, Patient: ${patientRecordTokens}, Total: ${totalInputTokens}`);
   
-  // Check if we need to chunk the care plan - be more aggressive with chunking
-  const maxInputTokens = 2000; // More conservative limit
+  // Check if we need to chunk the care plan - only chunk when absolutely necessary
+  const maxInputTokens = 5000; // Only chunk for very large inputs
   
   if (totalInputTokens > maxInputTokens) {
     console.log(`Large input detected (${totalInputTokens} tokens), using chunking approach...`);
@@ -184,7 +184,7 @@ export const generateSourceAttribution = async (
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.1,
-        max_tokens: 3000 // Reduced further to avoid hitting limits
+        max_tokens: 4000 // Back to 4000 to avoid hitting limits
       })
     });
 
