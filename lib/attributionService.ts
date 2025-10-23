@@ -3,16 +3,17 @@ import { SourceAttribution, AttributionSection, AttributionSource } from '@/type
 // System prompt for source attribution analysis
 const ATTRIBUTION_SYSTEM_PROMPT = `You are a clinical AI assistant specializing in **source attribution analysis** for pharmacist care plans.
 
-Your task is to identify which care plan statements are directly supported by the patient record, and which are clinical inferences or standard recommendations.
+Your task is to analyze the care plan and identify which statements are supported by patient data, clinical reasoning, or standard practice.
 
 ### INSTRUCTIONS
 1. **Parse the care plan** into its main sections (Problem List, SMART Goals, Interventions, Monitoring)
-2. **For each statement**, determine if it has a direct source in the patient record:
-   - **HAS SOURCE**: Statement is directly supported by specific patient data (medications, vitals, lab values, symptoms, etc.)
-   - **NO SOURCE**: Statement is a clinical inference, standard recommendation, or general medical knowledge
-3. **Only map statements that have clear sources** - skip generic recommendations and clinical inferences
-4. **Extract exact quotes** or paraphrases from the patient record that directly support the statement
-5. **Be selective** - focus on statements that are clearly derived from patient-specific data
+2. **For each statement**, identify the supporting evidence:
+   - **PATIENT DATA**: Direct references to patient information (medications, vitals, lab values, symptoms, demographics)
+   - **CLINICAL REASONING**: Inferences based on patient data and medical knowledge
+   - **STANDARD PRACTICE**: Evidence-based recommendations and guidelines
+3. **Map ALL statements** - don't skip any, but categorize the type of support
+4. **Extract supporting evidence** from the patient record or explain the clinical reasoning
+5. **Be comprehensive** - include all care plan statements with their appropriate attribution
 
 ### OUTPUT FORMAT
 Return ONLY a valid JSON object with this exact structure. Do not include any text before or after the JSON:
@@ -24,9 +25,11 @@ Return ONLY a valid JSON object with this exact structure. Do not include any te
         {
           "statement": "Exact care plan statement text",
           "sources": [
-            "Patient Record: Exact quote or paraphrase that supports this statement",
-            "Another supporting source from patient record"
-          ]
+            "Patient Record: [specific patient data that supports this]",
+            "Clinical Reasoning: [explanation of why this recommendation is made]",
+            "Standard Practice: [evidence-based guideline or standard of care]"
+          ],
+          "attribution_type": "patient_data|clinical_reasoning|standard_practice|mixed"
         }
       ]
     }
@@ -38,10 +41,10 @@ Return ONLY a valid JSON object with this exact structure. Do not include any te
 - Ensure all strings are properly quoted and escaped
 - Make sure all brackets and braces are properly closed
 - Keep responses concise to avoid truncation
-- **ONLY include statements that have clear sources in the patient record**
-- **Skip statements that are generic recommendations or clinical inferences**
-- Focus on patient-specific data that directly supports the statement
-- If a statement has no clear source, DO NOT include it in the attribution`;
+- **INCLUDE ALL care plan statements** - don't skip any
+- **Categorize the type of support** for each statement
+- **Provide specific evidence** from patient data when available
+- **Explain clinical reasoning** for recommendations and interventions`;
 
 // Build the user prompt for attribution analysis
 const buildAttributionPrompt = (carePlanText: string, patientRecordText: string): string => {
@@ -52,7 +55,12 @@ ${carePlanText}
 ${patientRecordText}
 
 ### TASK:
-Analyze the care plan above and identify ONLY the statements that are directly supported by specific data in the patient record. Skip generic recommendations, clinical inferences, and standard medical advice. Focus on statements that clearly derive from patient-specific information like medications, vitals, lab values, or documented symptoms. Return your analysis as structured JSON following the format specified in the system prompt.`;
+Analyze the care plan above and provide comprehensive source attribution for ALL statements. For each statement, identify:
+1. **Patient Data Sources**: Specific information from the patient record (medications, vitals, lab values, symptoms, demographics)
+2. **Clinical Reasoning**: Why this recommendation or intervention is appropriate based on the patient's condition
+3. **Standard Practice**: Evidence-based guidelines or standard of care that supports this statement
+
+Include ALL care plan statements - don't skip any. Categorize each statement's attribution type and provide supporting evidence. Return your analysis as structured JSON following the format specified in the system prompt.`;
 };
 
 // Generate source attribution using OpenRouter API
@@ -155,8 +163,17 @@ export const generateSourceAttribution = async (
         throw new Error('Invalid attribution structure: missing sections array');
       }
       
+      // Ensure attribution_type is set for each statement
+      const processedSections = parsed.sections.map((section: any) => ({
+        ...section,
+        statements: section.statements.map((statement: any) => ({
+          ...statement,
+          attribution_type: statement.attribution_type || 'clinical_reasoning'
+        }))
+      }));
+      
       attributionData = {
-        sections: parsed.sections,
+        sections: processedSections,
         generated_at: new Date().toISOString(),
         model_used: 'openai/gpt-oss-20b:free'
       };
@@ -174,7 +191,8 @@ export const generateSourceAttribution = async (
             statements: [
               {
                 statement: "Source attribution could not be generated due to technical issues",
-                sources: ["LLM response was incomplete or malformed - manual review recommended"]
+                sources: ["LLM response was incomplete or malformed - manual review recommended"],
+                attribution_type: "standard_practice"
               }
             ]
           }

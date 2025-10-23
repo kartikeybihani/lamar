@@ -116,6 +116,7 @@ export interface AuditLog {
 export interface AttributionSource {
   statement: string;
   sources: string[];
+  attribution_type?: 'patient_data' | 'clinical_reasoning' | 'standard_practice' | 'mixed';
 }
 
 export interface AttributionSection {
