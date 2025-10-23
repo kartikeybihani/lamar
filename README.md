@@ -93,10 +93,10 @@ Open [http://localhost:3000](http://localhost:3000) to see the application.
   supabase.ts              # Supabase client configuration
   supabaseServices.ts      # Database operations
   mockServices.ts          # API client functions
-/api
-  care-plans/index.ts      # Main care plan generation endpoint
+/app/api
+  care-plans/route.ts      # Main care plan generation endpoint
   duplicates/              # Duplicate checking endpoints
-  reports/index.ts         # Reports data endpoint
+  reports/route.ts         # Reports data endpoint
 /supabase-schema.sql       # Complete database schema
 ```
 
