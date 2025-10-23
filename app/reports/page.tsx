@@ -119,9 +119,10 @@ export default function ReportsPage() {
   return (
     <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
+        {/* Combined Header and Filters */}
         <div className="glass-card p-6 rounded-2xl shadow-lg mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          {/* Header Section */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 Care Plan Reports
@@ -139,66 +140,66 @@ export default function ReportsPage() {
               Export CSV
             </button>
           </div>
-        </div>
 
-        {/* Filters */}
-        <div className="glass-card p-6 rounded-2xl shadow-lg mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Filters & Search
-            </h2>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="btn-ghost flex items-center gap-2"
-            >
-              <Filter className="w-4 h-4" />
-              {showFilters ? "Hide Filters" : "Show Filters"}
-              {showFilters ? (
-                <ChevronUp className="w-4 h-4" />
-              ) : (
-                <ChevronDown className="w-4 h-4" />
-              )}
-            </button>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="form-label">Search</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="form-input pl-10"
-                  placeholder="Search by patient name, MRN, provider, or medication..."
-                />
-              </div>
+          {/* Search and Filters Section */}
+          <div className="border-t border-gray-200 pt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Filters & Search
+              </h2>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className="btn-ghost flex items-center gap-2"
+              >
+                <Filter className="w-4 h-4" />
+                {showFilters ? "Hide Filters" : "Show Filters"}
+                {showFilters ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
+              </button>
             </div>
 
-            {showFilters && (
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="form-label">Date Filter</label>
-                  <input
-                    type="date"
-                    value={dateFilter}
-                    onChange={(e) => setDateFilter(e.target.value)}
-                    className="form-input"
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Provider Filter</label>
+            <div className="space-y-4">
+              <div>
+                <label className="form-label">Search</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
                     type="text"
-                    value={providerFilter}
-                    onChange={(e) => setProviderFilter(e.target.value)}
-                    className="form-input"
-                    placeholder="Filter by provider name..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="form-input pl-10"
+                    placeholder="Search by patient name, MRN, provider, or medication..."
                   />
                 </div>
               </div>
-            )}
+
+              {showFilters && (
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="form-label">Date Filter</label>
+                    <input
+                      type="date"
+                      value={dateFilter}
+                      onChange={(e) => setDateFilter(e.target.value)}
+                      className="form-input"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Provider Filter</label>
+                    <input
+                      type="text"
+                      value={providerFilter}
+                      onChange={(e) => setProviderFilter(e.target.value)}
+                      className="form-input"
+                      placeholder="Filter by provider name..."
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
