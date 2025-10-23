@@ -1,8 +1,8 @@
 import { SourceAttribution, AttributionSection, AttributionSource } from '@/types';
 
-// Simple token estimation (rough approximation: 1 token ≈ 4 characters)
+// More accurate token estimation (1 token ≈ 3.5 characters for medical text)
 const estimateTokens = (text: string): number => {
-  return Math.ceil(text.length / 4);
+  return Math.ceil(text.length / 3.5);
 };
 
 // Optimized system prompt for source attribution analysis
@@ -55,7 +55,7 @@ const generateAttributionWithChunking = async (
   patientRecordText: string, 
   apiKey: string
 ): Promise<SourceAttribution> => {
-  const carePlanChunks = chunkText(carePlanText, 1500);
+  const carePlanChunks = chunkText(carePlanText, 1000); // Smaller chunks
   const allSections: AttributionSection[] = [];
   
   console.log(`Processing ${carePlanChunks.length} chunks for large care plan...`);
@@ -85,7 +85,7 @@ const generateAttributionWithChunking = async (
             { role: 'user', content: userPrompt }
           ],
           temperature: 0.1,
-          max_tokens: 2000 // Smaller for chunks
+          max_tokens: 1500 // Much smaller for chunks
         })
       });
 
@@ -96,9 +96,15 @@ const generateAttributionWithChunking = async (
       }
 
       const data = await response.json();
+      
+      if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+        console.error(`Invalid API response for chunk ${i + 1}:`, data);
+        continue; // Skip this chunk and continue with others
+      }
+      
       const attributionText = data.choices[0].message.content;
       
-      if (attributionText) {
+      if (attributionText && attributionText.trim().length > 0) {
         try {
           const chunkData = JSON.parse(attributionText.trim());
           if (chunkData.sections && Array.isArray(chunkData.sections)) {
@@ -150,8 +156,8 @@ export const generateSourceAttribution = async (
   
   console.log(`Token estimation - System: ${systemTokens}, Care Plan: ${carePlanTokens}, Patient: ${patientRecordTokens}, Total: ${totalInputTokens}`);
   
-  // Check if we need to chunk the care plan
-  const maxInputTokens = 3000; // Conservative limit to avoid 8k token limit
+  // Check if we need to chunk the care plan - be more aggressive with chunking
+  const maxInputTokens = 2000; // More conservative limit
   
   if (totalInputTokens > maxInputTokens) {
     console.log(`Large input detected (${totalInputTokens} tokens), using chunking approach...`);
@@ -178,7 +184,7 @@ export const generateSourceAttribution = async (
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.1,
-        max_tokens: 4000 // Reduced from 8000
+        max_tokens: 3000 // Reduced further to avoid hitting limits
       })
     });
 
@@ -198,7 +204,7 @@ export const generateSourceAttribution = async (
       console.error('Invalid OpenRouter API response for attribution:', data);
       throw new Error('Invalid response from OpenRouter API');
     }
-
+    
     const attributionText = data.choices[0].message.content;
     
     if (!attributionText || attributionText.trim().length === 0) {
