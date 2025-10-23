@@ -3,8 +3,17 @@ import { generateSourceAttribution } from '@/lib/attributionService';
 
 export async function POST(request: NextRequest) {
   try {
-    // Simple test data
-    const carePlanText = `**1. Problem List / Drug Therapy Problems (DTPs)**
+    // Try to get custom data from request body, fallback to simple test data
+    let carePlanText: string;
+    let patientRecordText: string;
+    
+    try {
+      const body = await request.json();
+      carePlanText = body.carePlanText;
+      patientRecordText = body.patientRecordText;
+    } catch {
+      // Fallback to simple test data
+      carePlanText = `**1. Problem List / Drug Therapy Problems (DTPs)**
 - Risk of hyperkalemia due to concurrent ACE inhibitor and potassium-sparing diuretic
 - Need for renal function monitoring
 
@@ -12,11 +21,12 @@ export async function POST(request: NextRequest) {
 - Maintain serum potassium < 5.0 mEq/L
 - Monitor renal function closely`;
 
-    const patientRecordText = `PATIENT INFORMATION:
+      patientRecordText = `PATIENT INFORMATION:
 Name: John Doe
 MRN: 123456
 Medication: Lisinopril 40mg daily, Spironolactone 50mg daily
 Diagnosis: Heart failure, Hypertension`;
+    }
 
     console.log('Testing simple attribution...');
     console.log('Care plan:', carePlanText);

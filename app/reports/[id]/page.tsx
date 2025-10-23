@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { toast } from "sonner";
 import { SourceAttribution } from "@/types";
-import ProvenanceDrawer from "@/app/components/ProvenanceDrawer";
 import {
   ArrowLeft,
   User,
@@ -19,6 +18,8 @@ import {
   Download,
   Printer,
   Eye,
+  ChevronDown,
+  ChevronUp,
   X,
 } from "lucide-react";
 
@@ -55,7 +56,19 @@ export default function PatientReportPage() {
   const [reportData, setReportData] = useState<PatientReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showProvenance, setShowProvenance] = useState(false);
+  const [showSources, setShowSources] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(
+    new Set()
+  );
+  const [highlightedSection, setHighlightedSection] = useState<string | null>(
+    null
+  );
+  const [highlightedStatement, setHighlightedStatement] = useState<
+    string | null
+  >(null);
+  const [selectedStatement, setSelectedStatement] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     if (params.id) {
@@ -201,6 +214,26 @@ Status: ${reportData.isFinal ? "Final" : "Draft"}`;
     });
   };
 
+  const toggleSection = (sectionName: string) => {
+    if (expandedSections.has(sectionName)) {
+      // If clicking on the currently expanded section, close it
+      setExpandedSections(new Set());
+      setHighlightedSection(null);
+    } else {
+      // If clicking on a different section, close all others and open this one
+      setExpandedSections(new Set([sectionName]));
+      setHighlightedSection(sectionName);
+      setHighlightedStatement(null); // Clear statement highlight when switching sections
+      setSelectedStatement(null); // Clear selected statement when switching sections
+    }
+  };
+
+  const handleStatementClick = (statement: string, sectionName: string) => {
+    setHighlightedStatement(statement);
+    setHighlightedSection(sectionName);
+    setSelectedStatement(statement);
+  };
+
   const formatCarePlanText = (text: string): string => {
     // Convert line breaks to <br> tags
     let formattedText = text.replace(/\n/g, "<br>");
@@ -216,6 +249,144 @@ Status: ${reportData.isFinal ? "Final" : "Draft"}`;
       /\*([^*]+)\*/g,
       "<strong>$1</strong>"
     );
+
+    // Add a simple test highlight to verify CSS is working
+    if (
+      highlightedSection === "Problem List" &&
+      highlightedStatement === "Patient has diabetes"
+    ) {
+      formattedText = formattedText.replace(
+        /(diabetes|diabetic|glucose|blood sugar)/gi,
+        '<span class="highlight-statement">$1</span>'
+      );
+      console.log("Test highlight applied");
+    }
+
+    // Add highlighting based on selected section and statement
+    if (highlightedSection && reportData?.sourceAttribution) {
+      console.log("Highlighting section:", highlightedSection);
+      console.log("Highlighted statement:", highlightedStatement);
+
+      const section = reportData.sourceAttribution.sections.find(
+        (s) => s.section === highlightedSection
+      );
+
+      if (section) {
+        console.log("Found section:", section);
+
+        if (highlightedStatement) {
+          // Highlight specific statement
+          console.log("Highlighting specific statement:", highlightedStatement);
+          const statementToHighlight = highlightedStatement.trim();
+          console.log("Original care plan text length:", formattedText.length);
+
+          // Try multiple approaches for better matching
+          const escapedStatement = statementToHighlight.replace(
+            /[.*+?^${}()|[\]\\]/g,
+            "\\$&"
+          );
+
+          // Try exact match first
+          if (formattedText.includes(statementToHighlight)) {
+            formattedText = formattedText.replace(
+              new RegExp(`(${escapedStatement})`, "gi"),
+              '<span class="highlight-statement">$1</span>'
+            );
+            console.log("Exact match found and highlighted");
+          } else {
+            // Try more flexible matching
+            console.log("Exact match not found, trying flexible matching...");
+
+            // Remove quotes and extra spaces for better matching
+            const cleanStatement = statementToHighlight
+              .replace(/[""]/g, "")
+              .trim();
+            console.log("Clean statement:", cleanStatement);
+
+            if (formattedText.includes(cleanStatement)) {
+              const escapedClean = cleanStatement.replace(
+                /[.*+?^${}()|[\]\\]/g,
+                "\\$&"
+              );
+              formattedText = formattedText.replace(
+                new RegExp(`(${escapedClean})`, "gi"),
+                '<span class="highlight-statement">$1</span>'
+              );
+              console.log("Clean match found and highlighted");
+            } else {
+              // Try partial matching with key phrases
+              const keyPhrases = cleanStatement
+                .split(/[,;.]/)
+                .filter((phrase) => phrase.trim().length > 5);
+              console.log("Key phrases:", keyPhrases);
+
+              keyPhrases.forEach((phrase) => {
+                const trimmedPhrase = phrase.trim();
+                if (trimmedPhrase && formattedText.includes(trimmedPhrase)) {
+                  const escapedPhrase = trimmedPhrase.replace(
+                    /[.*+?^${}()|[\]\\]/g,
+                    "\\$&"
+                  );
+                  formattedText = formattedText.replace(
+                    new RegExp(`(${escapedPhrase})`, "gi"),
+                    '<span class="highlight-statement">$1</span>'
+                  );
+                  console.log("Phrase matched:", trimmedPhrase);
+                }
+              });
+
+              // Fallback to word matching
+              const words = cleanStatement
+                .split(" ")
+                .filter((word) => word.length > 4);
+              console.log("Trying word matching with:", words);
+
+              words.forEach((word) => {
+                const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                formattedText = formattedText.replace(
+                  new RegExp(`(${escapedWord})`, "gi"),
+                  '<span class="highlight-statement">$1</span>'
+                );
+              });
+              console.log("Partial matching applied");
+            }
+          }
+        } else {
+          // Highlight all statements from the section
+          console.log("Highlighting all statements from section");
+          section.statements.forEach((statement) => {
+            const statementText = statement.statement.trim();
+            const escapedStatement = statementText.replace(
+              /[.*+?^${}()|[\]\\]/g,
+              "\\$&"
+            );
+
+            if (formattedText.includes(statementText)) {
+              formattedText = formattedText.replace(
+                new RegExp(`(${escapedStatement})`, "gi"),
+                '<span class="highlight-section">$1</span>'
+              );
+            }
+          });
+        }
+      }
+    }
+
+    // Debug: Log if we have any highlights
+    if (
+      formattedText.includes("highlight-statement") ||
+      formattedText.includes("highlight-section")
+    ) {
+      console.log("Highlights found in text!");
+      console.log(
+        "Text contains highlight-statement:",
+        formattedText.includes("highlight-statement")
+      );
+      console.log(
+        "Text contains highlight-section:",
+        formattedText.includes("highlight-section")
+      );
+    }
 
     return formattedText;
   };
@@ -264,15 +435,6 @@ Status: ${reportData.isFinal ? "Final" : "Draft"}`;
               Back to Reports
             </button>
             <div className="flex gap-2 print:hidden">
-              {reportData.sourceAttribution && (
-                <button
-                  onClick={() => setShowProvenance(true)}
-                  className="btn-primary flex items-center gap-2"
-                >
-                  <Eye className="w-4 h-4" />
-                  Show Provenance
-                </button>
-              )}
               <button
                 onClick={handleDownload}
                 className="btn-secondary flex items-center gap-2"
@@ -309,152 +471,312 @@ Status: ${reportData.isFinal ? "Final" : "Draft"}`;
 
         {/* Two Column Layout */}
         <div className="grid lg:grid-cols-3 gap-6">
-          {/* Left Column - Patient Information */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Patient Information Card */}
-            <div className="glass-card p-6 rounded-2xl shadow-lg print:shadow-none print:border">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <User className="w-5 h-5" />
-                Patient Information
-              </h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-500">
-                    Patient Name
-                  </label>
-                  <p className="text-lg font-semibold text-gray-900">
-                    {reportData.patientName}
-                  </p>
+          {/* Left Column - Patient Information and Sources */}
+          <div className="lg:col-span-1 space-y-6 transition-all duration-300 ease-in-out">
+            {!showSources ? (
+              <>
+                {/* Patient Information Card */}
+                <div className="glass-card p-6 rounded-2xl shadow-lg print:shadow-none print:border transition-all duration-300 ease-in-out">
+                  <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <User className="w-5 h-5" />
+                    Patient Information
+                  </h2>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">
+                        Patient Name
+                      </label>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {reportData.patientName}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">
+                        Medical Record Number (MRN)
+                      </label>
+                      <p className="text-lg font-mono font-semibold text-gray-900">
+                        {reportData.mrn}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">
+                        Provider
+                      </label>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {reportData.providerName}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        NPI: {reportData.providerNPI}
+                      </p>
+                    </div>
+                    {reportData.patientInfo.dateOfBirth && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">
+                          Date of Birth
+                        </label>
+                        <p className="text-lg text-gray-900">
+                          {formatDate(reportData.patientInfo.dateOfBirth)}
+                        </p>
+                      </div>
+                    )}
+                    {reportData.patientInfo.sex && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">
+                          Sex
+                        </label>
+                        <p className="text-lg text-gray-900">
+                          {reportData.patientInfo.sex}
+                        </p>
+                      </div>
+                    )}
+                    {reportData.patientInfo.weight && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">
+                          Weight
+                        </label>
+                        <p className="text-lg text-gray-900">
+                          {reportData.patientInfo.weight} kg
+                        </p>
+                      </div>
+                    )}
+                    {reportData.patientInfo.allergies && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">
+                          Allergies
+                        </label>
+                        <p className="text-lg text-gray-900">
+                          {reportData.patientInfo.allergies}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">
-                    Medical Record Number (MRN)
-                  </label>
-                  <p className="text-lg font-mono font-semibold text-gray-900">
-                    {reportData.mrn}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">
-                    Provider
-                  </label>
-                  <p className="text-lg font-semibold text-gray-900">
-                    {reportData.providerName}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    NPI: {reportData.providerNPI}
-                  </p>
-                </div>
-                {reportData.patientInfo.dateOfBirth && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">
-                      Date of Birth
-                    </label>
-                    <p className="text-lg text-gray-900">
-                      {formatDate(reportData.patientInfo.dateOfBirth)}
-                    </p>
-                  </div>
-                )}
-                {reportData.patientInfo.sex && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">
-                      Sex
-                    </label>
-                    <p className="text-lg text-gray-900">
-                      {reportData.patientInfo.sex}
-                    </p>
-                  </div>
-                )}
-                {reportData.patientInfo.weight && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">
-                      Weight
-                    </label>
-                    <p className="text-lg text-gray-900">
-                      {reportData.patientInfo.weight} kg
-                    </p>
-                  </div>
-                )}
-                {reportData.patientInfo.allergies && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">
-                      Allergies
-                    </label>
-                    <p className="text-lg text-gray-900">
-                      {reportData.patientInfo.allergies}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
 
-            {/* Diagnosis & Medication Card */}
-            <div className="glass-card p-6 rounded-2xl shadow-lg print:shadow-none print:border">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Stethoscope className="w-5 h-5" />
-                Diagnosis & Medication
-              </h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-500">
-                    Primary Diagnosis
-                  </label>
-                  <p className="text-lg font-semibold text-gray-900">
-                    {reportData.primaryDiagnosis}
-                  </p>
-                </div>
-                {reportData.additionalDiagnoses.length > 0 && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">
-                      Additional Diagnoses
-                    </label>
-                    <ul className="list-disc list-inside space-y-1">
-                      {reportData.additionalDiagnoses.map(
-                        (diagnosis, index) => (
-                          <li key={index} className="text-gray-900">
-                            {diagnosis}
-                          </li>
-                        )
-                      )}
-                    </ul>
+                {/* Diagnosis & Medication Card */}
+                <div className="glass-card p-6 rounded-2xl shadow-lg print:shadow-none print:border transition-all duration-300 ease-in-out">
+                  <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <Stethoscope className="w-5 h-5" />
+                    Diagnosis & Medication
+                  </h2>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">
+                        Primary Diagnosis
+                      </label>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {reportData.primaryDiagnosis}
+                      </p>
+                    </div>
+                    {reportData.additionalDiagnoses.length > 0 && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">
+                          Additional Diagnoses
+                        </label>
+                        <ul className="list-disc list-inside space-y-1">
+                          {reportData.additionalDiagnoses.map(
+                            (diagnosis, index) => (
+                              <li key={index} className="text-gray-900">
+                                {diagnosis}
+                              </li>
+                            )
+                          )}
+                        </ul>
+                      </div>
+                    )}
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">
+                        Medication
+                      </label>
+                      <p className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                        <Pill className="w-4 h-4" />
+                        {reportData.medication}
+                      </p>
+                    </div>
+                    {reportData.medicationHistory.length > 0 && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">
+                          Medication History
+                        </label>
+                        <ul className="list-disc list-inside space-y-1">
+                          {reportData.medicationHistory.map((med, index) => (
+                            <li key={index} className="text-gray-900">
+                              {med}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
-                )}
-                <div>
-                  <label className="text-sm font-medium text-gray-500">
-                    Medication
-                  </label>
-                  <p className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                    <Pill className="w-4 h-4" />
-                    {reportData.medication}
-                  </p>
                 </div>
-                {reportData.medicationHistory.length > 0 && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">
-                      Medication History
-                    </label>
-                    <ul className="list-disc list-inside space-y-1">
-                      {reportData.medicationHistory.map((med, index) => (
-                        <li key={index} className="text-gray-900">
-                          {med}
-                        </li>
-                      ))}
-                    </ul>
+              </>
+            ) : (
+              /* Sources Panel */
+              reportData.sourceAttribution && (
+                <div className="glass-card p-6 rounded-2xl shadow-lg print:shadow-none print:border transition-all duration-300 ease-in-out">
+                  <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <Eye className="w-5 h-5" />
+                    Sources
+                  </h2>
+                  <div className="space-y-4">
+                    {reportData.sourceAttribution.sections.map(
+                      (section, sectionIndex) => (
+                        <div
+                          key={sectionIndex}
+                          className="border border-gray-200 rounded-lg"
+                        >
+                          {/* Section Header */}
+                          <button
+                            onClick={() => toggleSection(section.section)}
+                            className="w-full p-4 bg-gray-50 rounded-t-lg text-left hover:bg-gray-100 transition-colors"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                                  <span className="text-sm font-semibold text-blue-600">
+                                    {sectionIndex + 1}
+                                  </span>
+                                </div>
+                                <div>
+                                  <h3 className="font-semibold text-gray-900 text-sm">
+                                    {section.section}
+                                  </h3>
+                                  <p className="text-xs text-gray-600">
+                                    {section.statements.length} statement
+                                    {section.statements.length !== 1 ? "s" : ""}
+                                  </p>
+                                </div>
+                              </div>
+                              <ChevronDown
+                                className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${
+                                  expandedSections.has(section.section)
+                                    ? "rotate-180"
+                                    : ""
+                                }`}
+                              />
+                            </div>
+                          </button>
+
+                          {/* Section Content */}
+                          {expandedSections.has(section.section) && (
+                            <div className="p-4 space-y-3 border-t border-gray-200 transition-all duration-300 ease-in-out">
+                              {section.statements.map(
+                                (statement, statementIndex) => (
+                                  <div
+                                    key={statementIndex}
+                                    className="bg-yellow-50 border border-yellow-200 rounded-lg p-3"
+                                  >
+                                    <div className="flex items-start gap-2">
+                                      <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <span className="text-xs font-semibold text-green-600">
+                                          {statementIndex + 1}
+                                        </span>
+                                      </div>
+                                      <div className="flex-1">
+                                        <button
+                                          onClick={() =>
+                                            handleStatementClick(
+                                              statement.statement,
+                                              section.section
+                                            )
+                                          }
+                                          className={`w-full text-left text-sm text-gray-800 mb-2 px-2 py-1 rounded font-semibold transition-colors cursor-pointer ${
+                                            selectedStatement ===
+                                            statement.statement
+                                              ? "bg-yellow-400 border-2 border-yellow-600 shadow-md"
+                                              : "bg-yellow-200 hover:bg-yellow-300"
+                                          }`}
+                                        >
+                                          "{statement.statement}"
+                                        </button>
+                                        <div>
+                                          <h5 className="text-xs font-medium text-gray-700 mb-1 flex items-center gap-1">
+                                            <CheckCircle className="w-3 h-3 text-green-500" />
+                                            Supporting Sources (
+                                            {statement.sources.length})
+                                          </h5>
+                                          <div className="bg-white border border-gray-200 rounded p-2 text-xs">
+                                            <ul className="space-y-1">
+                                              {statement.sources.map(
+                                                (source, sourceIndex) => (
+                                                  <li
+                                                    key={sourceIndex}
+                                                    className="text-gray-700"
+                                                  >
+                                                    {source}
+                                                  </li>
+                                                )
+                                              )}
+                                            </ul>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    )}
                   </div>
-                )}
-              </div>
-            </div>
+                </div>
+              )
+            )}
           </div>
 
           {/* Right Column - Care Plan */}
           <div className="lg:col-span-2">
             <div className="glass-card p-6 rounded-2xl shadow-lg print:shadow-none print:border h-full flex flex-col">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <FileText className="w-5 h-5" />
-                Care Plan
-              </h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Care Plan
+                </h2>
+                {reportData.sourceAttribution && (
+                  <button
+                    onClick={() => setShowSources(!showSources)}
+                    className="btn-primary flex items-center gap-2 text-sm"
+                  >
+                    <Eye className="w-4 h-4" />
+                    {showSources ? "Hide Sources" : "View Sources"}
+                  </button>
+                )}
+                {/* Debug button - remove this later */}
+                <button
+                  onClick={() => {
+                    setHighlightedSection("Problem List");
+                    setHighlightedStatement("Patient has diabetes");
+                  }}
+                  className="btn-secondary flex items-center gap-2 text-sm"
+                >
+                  Test Highlight
+                </button>
+              </div>
               <div className="bg-gray-50 rounded-lg p-6 print:bg-white print:border flex-1 flex flex-col">
+                <style jsx>{`
+                  .highlight-section {
+                    background-color: #fef3c7 !important;
+                    border: 2px solid #f59e0b !important;
+                    border-radius: 4px !important;
+                    padding: 2px 4px !important;
+                    font-weight: 600 !important;
+                    transition: all 0.3s ease !important;
+                    display: inline !important;
+                  }
+                  .highlight-statement {
+                    background-color: #fbbf24 !important;
+                    border: 2px solid #d97706 !important;
+                    border-radius: 4px !important;
+                    padding: 2px 4px !important;
+                    font-weight: 700 !important;
+                    transition: all 0.3s ease !important;
+                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+                    display: inline !important;
+                  }
+                `}</style>
                 <div
+                  key={`${highlightedSection}-${highlightedStatement}`}
                   className="text-gray-900 text-sm leading-relaxed flex-1 overflow-y-auto prose prose-sm max-w-none"
                   dangerouslySetInnerHTML={{
                     __html: formatCarePlanText(reportData.carePlanText),
@@ -470,15 +792,6 @@ Status: ${reportData.isFinal ? "Final" : "Draft"}`;
           </div>
         </div>
       </div>
-
-      {/* Provenance Drawer */}
-      {reportData.sourceAttribution && (
-        <ProvenanceDrawer
-          isOpen={showProvenance}
-          onClose={() => setShowProvenance(false)}
-          attribution={reportData.sourceAttribution}
-        />
-      )}
     </div>
   );
 }

@@ -43,12 +43,6 @@ export default function ProvenanceDrawer({
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black bg-opacity-50 z-40"
-        onClick={onClose}
-      />
-
       {/* Drawer */}
       <div className="fixed right-0 top-0 h-full w-full max-w-2xl bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out">
         <div className="flex flex-col h-full">
@@ -118,7 +112,7 @@ export default function ProvenanceDrawer({
                         {section.statements.map((statement, statementIndex) => (
                           <div
                             key={statementIndex}
-                            className="bg-gray-50 rounded-lg p-4"
+                            className="bg-yellow-50 border border-yellow-200 rounded-lg p-4"
                           >
                             <div className="flex items-start gap-3">
                               <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -140,26 +134,19 @@ export default function ProvenanceDrawer({
                                     Supporting Sources (
                                     {statement.sources.length})
                                   </h5>
-                                  <div className="space-y-2">
-                                    {statement.sources.map(
-                                      (source, sourceIndex) => (
-                                        <div
-                                          key={sourceIndex}
-                                          className="bg-white border border-gray-200 rounded-md p-3 text-sm"
-                                        >
-                                          <div className="flex items-start gap-2">
-                                            <div className="w-4 h-4 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                                              <span className="text-xs font-semibold text-blue-600">
-                                                {sourceIndex + 1}
-                                              </span>
-                                            </div>
-                                            <span className="text-gray-800">
-                                              {source}
-                                            </span>
-                                          </div>
-                                        </div>
-                                      )
-                                    )}
+                                  <div className="bg-white border border-gray-200 rounded-md p-3 text-sm">
+                                    <ul className="space-y-1">
+                                      {statement.sources.map(
+                                        (source, sourceIndex) => (
+                                          <li
+                                            key={sourceIndex}
+                                            className="text-gray-800"
+                                          >
+                                            {source}
+                                          </li>
+                                        )
+                                      )}
+                                    </ul>
                                   </div>
                                 </div>
                               </div>

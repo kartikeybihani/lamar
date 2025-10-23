@@ -128,7 +128,7 @@ const generateCarePlanText = async (formData: CarePlanFormData): Promise<string>
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.1,
-        max_tokens: 4000
+        max_tokens: 8000
       })
     });
 
