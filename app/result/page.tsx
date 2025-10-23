@@ -6,7 +6,6 @@ import Link from "next/link";
 import { toast } from "sonner";
 import {
   Download,
-  Save,
   ArrowLeft,
   FileText,
   Calendar,
@@ -17,14 +16,12 @@ import {
 } from "lucide-react";
 
 import { GeneratedCarePlan } from "@/types";
-import { saveCarePlan } from "@/lib/mockServices";
 import { downloadTextFile, formatDateTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 export default function ResultPage() {
   const router = useRouter();
   const [carePlan, setCarePlan] = useState<GeneratedCarePlan | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
@@ -59,21 +56,6 @@ export default function ResultPage() {
       toast.error("Failed to download care plan");
     } finally {
       setIsDownloading(false);
-    }
-  };
-
-  const handleSave = async () => {
-    if (!carePlan) return;
-
-    setIsSaving(true);
-    try {
-      await saveCarePlan(carePlan);
-      toast.success("Care plan saved to database successfully");
-    } catch (error) {
-      console.error("Error saving care plan:", error);
-      toast.error("Failed to save care plan");
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -176,21 +158,12 @@ export default function ResultPage() {
                 )}
                 {isDownloading ? "Downloading..." : "Download"}
               </button>
-              <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className={cn(
-                  "btn-primary flex items-center gap-2",
-                  isSaving && "opacity-50 cursor-not-allowed"
-                )}
-              >
-                {isSaving ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4" />
-                )}
-                {isSaving ? "Saving..." : "Save to Database"}
-              </button>
+              <div className="flex items-center gap-2 text-green-600 bg-green-50 px-3 py-2 rounded-lg">
+                <CheckCircle className="w-4 h-4" />
+                <span className="text-sm font-medium">
+                  Auto-saved to Database
+                </span>
+              </div>
             </div>
           </div>
 

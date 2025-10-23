@@ -1,120 +1,60 @@
-import { CarePlanFormData, GeneratedCarePlan, CarePlanRecord } from '@/types';
-
-// Mock data for duplicate checking
-const existingMRNs = ['123456', '789012', '345678'];
-const existingNPIs = ['1234567890', '0987654321', '1122334455'];
-
-// Mock care plan records
-const mockCarePlans: CarePlanRecord[] = [
-  {
-    id: '1',
-    patientName: 'John Smith',
-    mrn: '123456',
-    provider: 'Dr. Sarah Johnson',
-    medication: 'Metformin 500mg',
-    date: '2024-01-15'
-  },
-  {
-    id: '2',
-    patientName: 'Jane Doe',
-    mrn: '789012',
-    provider: 'Dr. Michael Chen',
-    medication: 'Lisinopril 10mg',
-    date: '2024-01-14'
-  },
-  {
-    id: '3',
-    patientName: 'Robert Wilson',
-    mrn: '345678',
-    provider: 'Dr. Emily Davis',
-    medication: 'Atorvastatin 20mg',
-    date: '2024-01-13'
-  }
-];
-
-// Simulate API delay
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+import { CarePlanFormData, GeneratedCarePlan, CarePlanRecord, DuplicateCheckResponse, CarePlanApiResponse } from '@/types';
 
 // Check if patient MRN already exists
 export const checkDuplicatePatient = async (mrn: string): Promise<boolean> => {
-  await delay(500); // Simulate API call
-  return existingMRNs.includes(mrn);
+  const response = await fetch(`/api/duplicates/patient?mrn=${mrn}`);
+  if (!response.ok) {
+    throw new Error('Failed to check patient duplicate');
+  }
+  const data: DuplicateCheckResponse = await response.json();
+  return data.isDuplicate;
 };
 
 // Check if provider NPI already exists
 export const checkDuplicateProvider = async (npi: string): Promise<boolean> => {
-  await delay(500); // Simulate API call
-  return existingNPIs.includes(npi);
+  const response = await fetch(`/api/duplicates/provider?npi=${npi}`);
+  if (!response.ok) {
+    throw new Error('Failed to check provider duplicate');
+  }
+  const data: DuplicateCheckResponse = await response.json();
+  return data.isDuplicate;
 };
 
-// Generate care plan using AI (mock)
+// Generate care plan using API
 export const generateCarePlan = async (formData: CarePlanFormData): Promise<GeneratedCarePlan> => {
-  await delay(2000); // Simulate AI processing time
+  const response = await fetch('/api/care-plans', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(formData),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Failed to generate care plan');
+  }
+
+  const data: CarePlanApiResponse = await response.json();
   
-  const carePlanText = `
-CARE PLAN FOR ${formData.patient.firstName.toUpperCase()} ${formData.patient.lastName.toUpperCase()}
-Medical Record Number: ${formData.patient.mrn}
-Provider: ${formData.provider.providerName} (NPI: ${formData.provider.providerNPI})
-Date Generated: ${new Date().toLocaleDateString()}
-
-PRIMARY DIAGNOSIS: ${formData.diagnosis.primaryDiagnosis}
-${formData.diagnosis.additionalDiagnoses.length > 0 ? 
-  `ADDITIONAL DIAGNOSES: ${formData.diagnosis.additionalDiagnoses.join(', ')}` : ''}
-
-MEDICATION: ${formData.diagnosis.medicationName}
-${formData.diagnosis.medicationHistory.length > 0 ? 
-  `MEDICATION HISTORY: ${formData.diagnosis.medicationHistory.join(', ')}` : ''}
-
-CARE PLAN RECOMMENDATIONS:
-
-1. MEDICATION MANAGEMENT
-   - Monitor patient adherence to ${formData.diagnosis.medicationName}
-   - Assess for drug interactions and side effects
-   - Adjust dosage as needed based on patient response
-
-2. PATIENT EDUCATION
-   - Provide comprehensive medication counseling
-   - Review proper administration techniques
-   - Discuss potential side effects and when to contact provider
-
-3. MONITORING PARAMETERS
-   - Regular follow-up appointments every 3 months
-   - Laboratory monitoring as indicated
-   - Assessment of therapeutic response
-
-4. LIFESTYLE MODIFICATIONS
-   - Dietary counseling as appropriate
-   - Exercise recommendations
-   - Smoking cessation if applicable
-
-5. CARE COORDINATION
-   - Coordinate with primary care provider
-   - Ensure appropriate referrals as needed
-   - Maintain communication with patient's care team
-
-FOLLOW-UP PLAN:
-- Next appointment scheduled for 3 months
-- Patient to contact pharmacy with any questions
-- Provider to review care plan effectiveness
-
-This care plan was generated using AI-assisted clinical decision support and should be reviewed by the healthcare provider before implementation.
-  `.trim();
-
   return {
-    id: `cp_${Date.now()}`,
-    patientName: `${formData.patient.firstName} ${formData.patient.lastName}`,
-    mrn: formData.patient.mrn,
-    providerName: formData.provider.providerName,
-    medication: formData.diagnosis.medicationName,
-    carePlanText,
-    generatedAt: new Date()
+    id: data.id,
+    patientName: data.patientName,
+    mrn: data.mrn,
+    providerName: data.providerName,
+    medication: data.medication,
+    carePlanText: data.carePlanText,
+    generatedAt: new Date(data.generatedAt)
   };
 };
 
 // Get all care plans for reports
 export const getAllCarePlans = async (): Promise<CarePlanRecord[]> => {
-  await delay(300); // Simulate API call
-  return mockCarePlans;
+  const response = await fetch('/api/reports');
+  if (!response.ok) {
+    throw new Error('Failed to fetch care plans');
+  }
+  return await response.json();
 };
 
 // Export care plans to CSV
@@ -137,9 +77,9 @@ export const exportToCSV = (data: CarePlanRecord[]): void => {
   window.URL.revokeObjectURL(url);
 };
 
-// Save care plan to database (mock)
+// Save care plan to database (now handled automatically in generateCarePlan)
 export const saveCarePlan = async (carePlan: GeneratedCarePlan): Promise<boolean> => {
-  await delay(1000); // Simulate database save
-  console.log('Care plan saved to database:', carePlan);
+  // Care plan is automatically saved during generation
+  console.log('Care plan already saved to database:', carePlan);
   return true;
 };
