@@ -13,14 +13,17 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
+  ArrowRight,
 } from "lucide-react";
 
 import { CarePlanRecord } from "@/types";
 import { getAllCarePlans, exportToCSV } from "@/lib/mockServices";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 
 export default function ReportsPage() {
+  const router = useRouter();
   const [carePlans, setCarePlans] = useState<CarePlanRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -64,6 +67,10 @@ export default function ReportsPage() {
       setSortBy(field);
       setSortOrder("asc");
     }
+  };
+
+  const handleViewReport = (planId: string) => {
+    router.push(`/reports/${planId}`);
   };
 
   const filteredCarePlans = carePlans
@@ -253,12 +260,17 @@ export default function ReportsPage() {
                         ))}
                     </button>
                   </th>
+                  <th className="px-6 py-3 text-center">
+                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </span>
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center">
+                    <td colSpan={6} className="px-6 py-12 text-center">
                       <div className="text-gray-500">
                         <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
                         <p className="text-lg font-medium">
@@ -269,7 +281,7 @@ export default function ReportsPage() {
                   </tr>
                 ) : filteredCarePlans.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center">
+                    <td colSpan={6} className="px-6 py-12 text-center">
                       <div className="text-gray-500">
                         <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                         <p className="text-lg font-medium">
@@ -321,6 +333,15 @@ export default function ReportsPage() {
                             {formatDate(plan.date)}
                           </span>
                         </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <button
+                          onClick={() => handleViewReport(plan.id)}
+                          className="inline-flex items-center justify-center w-8 h-8 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors duration-200"
+                          title="View detailed report"
+                        >
+                          <ArrowRight className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   ))
