@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Toaster } from "sonner";
+import Navbar from "./components/Navbar";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,8 +15,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Hello World",
-  description: "A simple Hello World app",
+  title: "Care Plan Generator - Specialty Pharmacy",
+  description:
+    "Automate pharmacist care plans in minutes using patient records. Generate comprehensive care plans with AI assistance.",
+  keywords: ["healthcare", "pharmacy", "care plans", "medical", "AI"],
 };
 
 export default function RootLayout({
@@ -27,7 +31,18 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <Navbar />
+        <main className="min-h-screen">{children}</main>
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            style: {
+              background: "rgba(255, 255, 255, 0.9)",
+              backdropFilter: "blur(10px)",
+              border: "1px solid rgba(255, 255, 255, 0.2)",
+            },
+          }}
+        />
       </body>
     </html>
   );
