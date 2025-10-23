@@ -152,6 +152,11 @@ export default function NewCarePlanPage() {
 
   // Handle form submission
   const onSubmit = async (data: CarePlanFormData) => {
+    // Only submit if we're on the final step and the submit button was clicked
+    if (currentStep !== 4) {
+      return;
+    }
+
     if (showMRNWarning || showNPIWarning) {
       toast.error("Please resolve duplicate warnings before submitting");
       return;
@@ -168,10 +173,42 @@ export default function NewCarePlanPage() {
       router.push("/result");
     } catch (error) {
       console.error("Error generating care plan:", error);
-      toast.error("Failed to generate care plan. Please try again.");
+
+      // Handle different types of errors
+      let errorMessage = "Failed to generate care plan. Please try again.";
+
+      if (error instanceof Error) {
+        console.error("Error details:", error.message);
+
+        // Check if it's an API error with details
+        if (error.message.includes("Failed to generate care plan")) {
+          errorMessage =
+            "AI service temporarily unavailable. Please try again in a few moments.";
+        } else if (error.message.includes("OPENROUTER_API_KEY")) {
+          errorMessage = "Service configuration error. Please contact support.";
+        } else if (error.message.includes("OpenRouter API error")) {
+          errorMessage =
+            "AI service error. Please try again or contact support if the issue persists.";
+        }
+      }
+
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Handle form submission only when explicitly triggered
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Only allow submission on step 4
+    if (currentStep !== 4) {
+      return;
+    }
+
+    const data = watchedValues as CarePlanFormData;
+    await onSubmit(data);
   };
 
   const canSubmit =
@@ -329,7 +366,7 @@ export default function NewCarePlanPage() {
           {/* Form Section */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-              <form onSubmit={handleSubmit(onSubmit)}>
+              <form onSubmit={handleFormSubmit} key={currentStep}>
                 {/* Step 1: Patient Information */}
                 {currentStep === 1 && (
                   <div className="p-8">
@@ -720,6 +757,13 @@ export default function NewCarePlanPage() {
                       <button
                         type="submit"
                         disabled={!canSubmit}
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          if (canSubmit) {
+                            const data = watchedValues as CarePlanFormData;
+                            await onSubmit(data);
+                          }
+                        }}
                         className={cn(
                           "flex items-center gap-2 px-6 py-2 rounded-lg transition-all",
                           canSubmit
