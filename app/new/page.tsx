@@ -184,7 +184,7 @@ export default function NewCarePlanPage() {
         if (error.message.includes("Failed to generate care plan")) {
           errorMessage =
             "AI service temporarily unavailable. Please try again in a few moments.";
-        } else if (error.message.includes("OPENROUTER_API_KEY")) {
+        } else if (error.message.includes("OPENAI_API_KEY")) {
           errorMessage = "Service configuration error. Please contact support.";
         } else if (error.message.includes("OpenRouter API error")) {
           errorMessage =
