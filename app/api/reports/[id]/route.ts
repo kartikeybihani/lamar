@@ -15,7 +15,7 @@ export async function GET(
       );
     }
 
-    // Fetch the care plan with all related data
+    // Fetch the care plan with all related data including source attribution
     const { data: carePlan, error } = await supabase
       .from('care_plans')
       .select(`
@@ -25,6 +25,7 @@ export async function GET(
         generated_by,
         version,
         is_final,
+        source_attribution,
         orders!inner(
           id,
           medication_name,
@@ -96,6 +97,7 @@ export async function GET(
         allergies: patient.allergies,
       },
       orderCreatedAt: order.created_at,
+      sourceAttribution: carePlan.source_attribution,
     };
 
     return NextResponse.json(reportData);

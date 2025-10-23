@@ -128,7 +128,7 @@ const generateCarePlanText = async (formData: CarePlanFormData): Promise<string>
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.1,
-        max_tokens: 2000
+        max_tokens: 3000
       })
     });
 
@@ -277,6 +277,38 @@ export async function POST(request: NextRequest) {
 
     // Log care plan creation
     await logAuditEvent('generate_care_plan', carePlanId, 'care_plan', 'Care plan generated')
+
+    // Trigger source attribution asynchronously (fire and forget)
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const attributionUrl = `${baseUrl}/api/care-plans/${carePlanId}/attribution`;
+      
+      console.log(`Triggering async source attribution for care plan ${carePlanId} at ${attributionUrl}`);
+      
+      // Fire async request without awaiting - runs in background
+      fetch(attributionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      .then(async (response) => {
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Attribution API error:', response.status, errorText);
+        } else {
+          console.log(`Successfully triggered attribution for care plan ${carePlanId}`);
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to trigger source attribution:', error);
+        // Don't throw - attribution failure shouldn't block care plan generation
+      });
+      
+    } catch (error) {
+      console.error('Error triggering source attribution:', error);
+      // Don't throw - attribution failure shouldn't block care plan generation
+    }
 
     // Return complete care plan
     const carePlan = {

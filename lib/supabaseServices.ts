@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { CarePlanFormData, GeneratedCarePlan, CarePlanRecord } from '@/types'
+import { CarePlanFormData, GeneratedCarePlan, CarePlanRecord, SourceAttribution } from '@/types'
 
 // Check if patient MRN already exists
 export const checkDuplicatePatient = async (mrn: string): Promise<boolean> => {
@@ -201,5 +201,20 @@ export const getAllCarePlans = async (): Promise<CarePlanRecord[]> => {
     medication: carePlan.orders.medication_name,
     date: carePlan.generated_at.split('T')[0]
   }))
+}
+
+// Update care plan with source attribution data
+export const updateCarePlanAttribution = async (
+  carePlanId: string,
+  attributionData: SourceAttribution
+): Promise<void> => {
+  const { error } = await supabase
+    .from('care_plans')
+    .update({ source_attribution: attributionData })
+    .eq('id', carePlanId)
+
+  if (error) {
+    throw new Error(`Failed to update care plan attribution: ${error.message}`)
+  }
 }
 

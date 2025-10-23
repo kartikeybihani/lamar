@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { toast } from "sonner";
+import { SourceAttribution } from "@/types";
+import ProvenanceDrawer from "@/app/components/ProvenanceDrawer";
 import {
   ArrowLeft,
   User,
@@ -16,6 +18,8 @@ import {
   Loader2,
   Download,
   Printer,
+  Eye,
+  X,
 } from "lucide-react";
 
 interface PatientReportData {
@@ -42,6 +46,7 @@ interface PatientReportData {
     allergies: string | null;
   };
   orderCreatedAt: string;
+  sourceAttribution?: SourceAttribution;
 }
 
 export default function PatientReportPage() {
@@ -50,6 +55,7 @@ export default function PatientReportPage() {
   const [reportData, setReportData] = useState<PatientReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showProvenance, setShowProvenance] = useState(false);
 
   useEffect(() => {
     if (params.id) {
@@ -258,6 +264,15 @@ Status: ${reportData.isFinal ? "Final" : "Draft"}`;
               Back to Reports
             </button>
             <div className="flex gap-2 print:hidden">
+              {reportData.sourceAttribution && (
+                <button
+                  onClick={() => setShowProvenance(true)}
+                  className="btn-primary flex items-center gap-2"
+                >
+                  <Eye className="w-4 h-4" />
+                  Show Provenance
+                </button>
+              )}
               <button
                 onClick={handleDownload}
                 className="btn-secondary flex items-center gap-2"
@@ -455,6 +470,15 @@ Status: ${reportData.isFinal ? "Final" : "Draft"}`;
           </div>
         </div>
       </div>
+
+      {/* Provenance Drawer */}
+      {reportData.sourceAttribution && (
+        <ProvenanceDrawer
+          isOpen={showProvenance}
+          onClose={() => setShowProvenance(false)}
+          attribution={reportData.sourceAttribution}
+        />
+      )}
     </div>
   );
 }

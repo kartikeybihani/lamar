@@ -111,3 +111,20 @@ export interface AuditLog {
   description: string | null;
   created_at: string;
 }
+
+// Attribution types for source mapping
+export interface AttributionSource {
+  statement: string;
+  sources: string[];
+}
+
+export interface AttributionSection {
+  section: string;
+  statements: AttributionSource[];
+}
+
+export interface SourceAttribution {
+  sections: AttributionSection[];
+  generated_at: string;
+  model_used: string;
+}

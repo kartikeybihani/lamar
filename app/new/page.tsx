@@ -181,8 +181,37 @@ export default function NewCarePlanPage() {
   };
 
   // Handle file upload
-  const handleFileSelect = (file: File | null) => {
+  const handleFileSelect = async (file: File | null) => {
     setValue("records.patientFile", file);
+
+    // If a PDF is uploaded, parse it and auto-fill the textarea
+    if (file && file.type === "application/pdf") {
+      try {
+        const formData = new FormData();
+        formData.append("pdf", file);
+
+        const response = await fetch("/api/parse-pdf", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          toast.error(`Failed to parse PDF: ${errorData.error}`);
+          return;
+        }
+
+        const { text } = await response.json();
+
+        // Auto-fill the clinical notes textarea with extracted text
+        setValue("records.patientRecords", text);
+
+        toast.success("PDF parsed successfully! Clinical notes updated.");
+      } catch (error) {
+        console.error("Error parsing PDF:", error);
+        toast.error("Failed to parse PDF file. Please try again.");
+      }
+    }
   };
 
   // Handle form submission
