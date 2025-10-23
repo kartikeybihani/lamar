@@ -1,34 +1,21 @@
 import { SourceAttribution, AttributionSection, AttributionSource } from '@/types';
 
-// System prompt for source attribution analysis
-const ATTRIBUTION_SYSTEM_PROMPT = `You are a clinical AI assistant specializing in **source attribution analysis** for pharmacist care plans.
+// Simple token estimation (rough approximation: 1 token ≈ 4 characters)
+const estimateTokens = (text: string): number => {
+  return Math.ceil(text.length / 4);
+};
 
-Your task is to analyze the care plan and identify which statements are supported by patient data, clinical reasoning, or standard practice.
+// Optimized system prompt for source attribution analysis
+const ATTRIBUTION_SYSTEM_PROMPT = `Analyze the care plan and map each statement to its supporting evidence. Return ONLY valid JSON:
 
-### INSTRUCTIONS
-1. **Parse the care plan** into its main sections (Problem List, SMART Goals, Interventions, Monitoring)
-2. **For each statement**, identify the supporting evidence:
-   - **PATIENT DATA**: Direct references to patient information (medications, vitals, lab values, symptoms, demographics)
-   - **CLINICAL REASONING**: Inferences based on patient data and medical knowledge
-   - **STANDARD PRACTICE**: Evidence-based recommendations and guidelines
-3. **Map ALL statements** - don't skip any, but categorize the type of support
-4. **Extract supporting evidence** from the patient record or explain the clinical reasoning
-5. **Be comprehensive** - include all care plan statements with their appropriate attribution
-
-### OUTPUT FORMAT
-Return ONLY a valid JSON object with this exact structure. Do not include any text before or after the JSON:
 {
   "sections": [
     {
-      "section": "Section Name (e.g., Problem List / DTPs)",
+      "section": "Section Name",
       "statements": [
         {
-          "statement": "Exact care plan statement text",
-          "sources": [
-            "Patient Record: [specific patient data that supports this]",
-            "Clinical Reasoning: [explanation of why this recommendation is made]",
-            "Standard Practice: [evidence-based guideline or standard of care]"
-          ],
+          "statement": "Exact text",
+          "sources": ["Patient Record: [data]", "Clinical Reasoning: [explanation]", "Standard Practice: [guideline]"],
           "attribution_type": "patient_data|clinical_reasoning|standard_practice|mixed"
         }
       ]
@@ -36,34 +23,115 @@ Return ONLY a valid JSON object with this exact structure. Do not include any te
   ]
 }
 
-### CRITICAL JSON REQUIREMENTS
-- Return ONLY valid JSON - no markdown, no explanations, no extra text
-- Ensure all strings are properly quoted and escaped
-- Make sure all brackets and braces are properly closed
-- Keep responses concise to avoid truncation
-- **INCLUDE ALL care plan statements** - don't skip any
-- **Categorize the type of support** for each statement
-- **Provide specific evidence** from patient data when available
-- **Explain clinical reasoning** for recommendations and interventions`;
+Map ALL statements. Categorize support type. Be concise.`;
 
-// Build the user prompt for attribution analysis
-const buildAttributionPrompt = (carePlanText: string, patientRecordText: string): string => {
-  return `### CARE PLAN TO ANALYZE:
-${carePlanText}
-
-### ORIGINAL PATIENT RECORD:
-${patientRecordText}
-
-### TASK:
-Analyze the care plan above and provide comprehensive source attribution for ALL statements. For each statement, identify:
-1. **Patient Data Sources**: Specific information from the patient record (medications, vitals, lab values, symptoms, demographics)
-2. **Clinical Reasoning**: Why this recommendation or intervention is appropriate based on the patient's condition
-3. **Standard Practice**: Evidence-based guidelines or standard of care that supports this statement
-
-Include ALL care plan statements - don't skip any. Categorize each statement's attribution type and provide supporting evidence. Return your analysis as structured JSON following the format specified in the system prompt.`;
+// Helper function to chunk large text
+const chunkText = (text: string, maxChunkSize: number = 2000): string[] => {
+  if (text.length <= maxChunkSize) return [text];
+  
+  const chunks: string[] = [];
+  const lines = text.split('\n');
+  let currentChunk = '';
+  
+  for (const line of lines) {
+    if (currentChunk.length + line.length + 1 > maxChunkSize && currentChunk.length > 0) {
+      chunks.push(currentChunk.trim());
+      currentChunk = line;
+    } else {
+      currentChunk += (currentChunk ? '\n' : '') + line;
+    }
+  }
+  
+  if (currentChunk.trim()) {
+    chunks.push(currentChunk.trim());
+  }
+  
+  return chunks;
 };
 
-// Generate source attribution using OpenRouter API
+// Generate attribution with chunking for large care plans
+const generateAttributionWithChunking = async (
+  carePlanText: string, 
+  patientRecordText: string, 
+  apiKey: string
+): Promise<SourceAttribution> => {
+  const carePlanChunks = chunkText(carePlanText, 1500);
+  const allSections: AttributionSection[] = [];
+  
+  console.log(`Processing ${carePlanChunks.length} chunks for large care plan...`);
+  
+  for (let i = 0; i < carePlanChunks.length; i++) {
+    const chunk = carePlanChunks[i];
+    const chunkTokens = estimateTokens(chunk);
+    const patientTokens = estimateTokens(patientRecordText);
+    const systemTokens = estimateTokens(ATTRIBUTION_SYSTEM_PROMPT);
+    const totalChunkTokens = systemTokens + chunkTokens + patientTokens;
+    
+    console.log(`Processing chunk ${i + 1}/${carePlanChunks.length} (${chunk.length} chars, ~${totalChunkTokens} tokens)`);
+    
+    const userPrompt = buildAttributionPrompt(chunk, patientRecordText);
+    
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'openai/gpt-oss-20b:free',
+          messages: [
+            { role: 'system', content: ATTRIBUTION_SYSTEM_PROMPT },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature: 0.1,
+          max_tokens: 2000 // Smaller for chunks
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Chunk ${i + 1} API error:`, response.status, errorText);
+        continue; // Skip this chunk and continue with others
+      }
+
+      const data = await response.json();
+      const attributionText = data.choices[0].message.content;
+      
+      if (attributionText) {
+        try {
+          const chunkData = JSON.parse(attributionText.trim());
+          if (chunkData.sections && Array.isArray(chunkData.sections)) {
+            allSections.push(...chunkData.sections);
+          }
+        } catch (parseError) {
+          console.error(`Error parsing chunk ${i + 1}:`, parseError);
+        }
+      }
+    } catch (error) {
+      console.error(`Error processing chunk ${i + 1}:`, error);
+    }
+  }
+  
+  return {
+    sections: allSections,
+    generated_at: new Date().toISOString(),
+    model_used: 'openai/gpt-oss-20b:free'
+  };
+};
+
+// Optimized user prompt for attribution analysis
+const buildAttributionPrompt = (carePlanText: string, patientRecordText: string): string => {
+  return `CARE PLAN:
+${carePlanText}
+
+PATIENT DATA:
+${patientRecordText}
+
+Analyze each statement. Map to patient data, clinical reasoning, or standard practice. Return JSON.`;
+};
+
+// Generate source attribution using OpenRouter API with chunking
 export const generateSourceAttribution = async (
   carePlanText: string, 
   patientRecordText: string
@@ -72,6 +140,22 @@ export const generateSourceAttribution = async (
   
   if (!apiKey) {
     throw new Error('OPENROUTER_API_KEY environment variable is not set');
+  }
+
+  // Token estimation and monitoring
+  const systemTokens = estimateTokens(ATTRIBUTION_SYSTEM_PROMPT);
+  const carePlanTokens = estimateTokens(carePlanText);
+  const patientRecordTokens = estimateTokens(patientRecordText);
+  const totalInputTokens = systemTokens + carePlanTokens + patientRecordTokens;
+  
+  console.log(`Token estimation - System: ${systemTokens}, Care Plan: ${carePlanTokens}, Patient: ${patientRecordTokens}, Total: ${totalInputTokens}`);
+  
+  // Check if we need to chunk the care plan
+  const maxInputTokens = 3000; // Conservative limit to avoid 8k token limit
+  
+  if (totalInputTokens > maxInputTokens) {
+    console.log(`Large input detected (${totalInputTokens} tokens), using chunking approach...`);
+    return await generateAttributionWithChunking(carePlanText, patientRecordText, apiKey);
   }
 
   const userPrompt = buildAttributionPrompt(carePlanText, patientRecordText);
@@ -94,7 +178,7 @@ export const generateSourceAttribution = async (
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.1,
-        max_tokens: 8000
+        max_tokens: 4000 // Reduced from 8000
       })
     });
 
