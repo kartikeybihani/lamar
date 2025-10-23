@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Care Plan Generator - Specialty Pharmacy",
   description:
-    "Automate pharmacist care plans in minutes using patient records. Generate comprehensive care plans with AI assistance.",
+    "Automate pharmacist care plans in seconds using patient records. Generate comprehensive care plans with AI assistance.",
   keywords: ["healthcare", "pharmacy", "care plans", "medical", "AI"],
 };
 

@@ -25,6 +25,7 @@ import { carePlanFormSchema, type CarePlanFormData } from "@/lib/validations";
 import {
   checkDuplicatePatient,
   checkDuplicateProvider,
+  checkDuplicateOrder,
   generateCarePlan,
 } from "@/lib/mockServices";
 import { cn } from "@/lib/utils";
@@ -37,8 +38,10 @@ export default function NewCarePlanPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showMRNWarning, setShowMRNWarning] = useState(false);
   const [showNPIWarning, setShowNPIWarning] = useState(false);
+  const [showOrderWarning, setShowOrderWarning] = useState(false);
   const [checkingMRN, setCheckingMRN] = useState(false);
   const [checkingNPI, setCheckingNPI] = useState(false);
+  const [checkingOrder, setCheckingOrder] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [showPreview, setShowPreview] = useState(false);
 
@@ -103,6 +106,38 @@ export default function NewCarePlanPage() {
     }
   };
 
+  // Handle order duplicate check
+  const handleOrderDuplicateCheck = async () => {
+    const mrn = watchedValues.patient?.mrn;
+    const medicationName = watchedValues.diagnosis?.medicationName;
+    const primaryDiagnosis = watchedValues.diagnosis?.primaryDiagnosis;
+
+    if (!mrn || !medicationName || !primaryDiagnosis) return;
+
+    setCheckingOrder(true);
+    try {
+      const isDuplicate = await checkDuplicateOrder(
+        mrn,
+        medicationName,
+        primaryDiagnosis
+      );
+      if (isDuplicate) {
+        setShowOrderWarning(true);
+        setError("diagnosis.medicationName", {
+          message:
+            "Duplicate order exists for this patient, medication, and diagnosis combination",
+        });
+      } else {
+        setShowOrderWarning(false);
+        clearErrors("diagnosis.medicationName");
+      }
+    } catch (error) {
+      console.error("Error checking order duplicate:", error);
+    } finally {
+      setCheckingOrder(false);
+    }
+  };
+
   // Handle additional diagnoses
   const addDiagnosis = () => {
     const current = watchedValues.diagnosis?.additionalDiagnoses || [];
@@ -157,7 +192,7 @@ export default function NewCarePlanPage() {
       return;
     }
 
-    if (showMRNWarning || showNPIWarning) {
+    if (showMRNWarning || showNPIWarning || showOrderWarning) {
       toast.error("Please resolve duplicate warnings before submitting");
       return;
     }
@@ -212,7 +247,11 @@ export default function NewCarePlanPage() {
   };
 
   const canSubmit =
-    isValid && !showMRNWarning && !showNPIWarning && !isSubmitting;
+    isValid &&
+    !showMRNWarning &&
+    !showNPIWarning &&
+    !showOrderWarning &&
+    !isSubmitting;
 
   // Step configuration
   const steps = [
@@ -286,12 +325,12 @@ export default function NewCarePlanPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="text-center">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">
               Create New Care Plan
             </h1>
-            <p className="text-gray-600 max-w-2xl mx-auto">
+            <p className="text-gray-600 max-w-2xl mx-auto text-sm">
               Follow the steps below to generate a comprehensive care plan. Each
               section builds upon the previous one.
             </p>
@@ -299,9 +338,9 @@ export default function NewCarePlanPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Progress Steps */}
-        <div className="mb-8">
+        <div className="mb-6">
           <div className="flex items-center justify-between">
             {steps.map((step, index) => {
               const Icon = step.icon;
@@ -314,9 +353,9 @@ export default function NewCarePlanPage() {
                   <div className="flex flex-col items-center">
                     <div
                       className={cn(
-                        "w-12 h-12 rounded-full flex items-center justify-center border-2 transition-all duration-200",
+                        "w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-200",
                         isActive &&
-                          "bg-blue-600 border-blue-600 text-white shadow-lg scale-110",
+                          "bg-blue-600 border-blue-600 text-white shadow-lg scale-105",
                         isCompleted &&
                           "bg-green-500 border-green-500 text-white",
                         !isActive &&
@@ -328,32 +367,50 @@ export default function NewCarePlanPage() {
                       )}
                     >
                       {isCompleted ? (
-                        <CheckCircle className="w-6 h-6" />
+                        <CheckCircle className="w-5 h-5" />
                       ) : (
-                        <Icon className="w-6 h-6" />
+                        <Icon className="w-5 h-5" />
                       )}
                     </div>
-                    <div className="mt-2 text-center">
+                    <div className="mt-1 text-center">
                       <p
                         className={cn(
-                          "text-sm font-medium",
+                          "text-xs font-medium",
                           isActive ? "text-blue-600" : "text-gray-500"
                         )}
                       >
                         {step.title}
                       </p>
-                      <p className="text-xs text-gray-400 mt-1">
+                      <p className="text-xs text-gray-400 mt-0.5">
                         {step.description}
                       </p>
                     </div>
                   </div>
                   {index < steps.length - 1 && (
-                    <div
-                      className={cn(
-                        "flex-1 h-0.5 mx-4 transition-colors duration-200",
-                        isCompleted ? "bg-green-500" : "bg-gray-200"
-                      )}
-                    />
+                    <div className="flex items-center mx-4">
+                      <div
+                        className={cn(
+                          "flex-1 h-0.5 transition-colors duration-200 relative",
+                          isCompleted ? "bg-green-500" : "bg-gray-200"
+                        )}
+                      >
+                        {/* Long arrow spanning the full distance */}
+                        <div
+                          className={cn(
+                            "absolute inset-0 flex items-center justify-end transition-colors duration-200",
+                            isCompleted ? "text-green-500" : "text-gray-300"
+                          )}
+                        >
+                          <div className="flex items-center w-full">
+                            {/* Long line with arrow head */}
+                            <div className="flex-1 h-0.5 bg-current"></div>
+                            <div className="ml-1">
+                              <ArrowRight className="w-4 h-4" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
               );
@@ -362,36 +419,36 @@ export default function NewCarePlanPage() {
         </div>
 
         {/* Main Content */}
-        <div className="grid lg:grid-cols-3 gap-8">
+        <div className="grid lg:grid-cols-3 gap-6">
           {/* Form Section */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
               <form onSubmit={handleFormSubmit} key={currentStep}>
                 {/* Step 1: Patient Information */}
                 {currentStep === 1 && (
-                  <div className="p-8">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                        <User className="w-5 h-5 text-blue-600" />
+                  <div className="p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <User className="w-4 h-4 text-blue-600" />
                       </div>
                       <div>
-                        <h2 className="text-2xl font-bold text-gray-900">
+                        <h2 className="text-xl font-bold text-gray-900">
                           Patient Information
                         </h2>
-                        <p className="text-gray-600">
+                        <p className="text-gray-600 text-sm">
                           Enter the patient's basic details
                         </p>
                       </div>
                     </div>
 
-                    <div className="grid md:grid-cols-2 gap-6">
+                    <div className="grid md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <label className="block text-sm font-medium text-gray-700">
                           First Name *
                         </label>
                         <input
                           {...register("patient.firstName")}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                           placeholder="Enter first name"
                         />
                         {errors.patient?.firstName && (
@@ -406,7 +463,7 @@ export default function NewCarePlanPage() {
                         </label>
                         <input
                           {...register("patient.lastName")}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                           placeholder="Enter last name"
                         />
                         {errors.patient?.lastName && (
@@ -417,7 +474,7 @@ export default function NewCarePlanPage() {
                       </div>
                     </div>
 
-                    <div className="mt-6 space-y-2">
+                    <div className="mt-4 space-y-2">
                       <label className="block text-sm font-medium text-gray-700">
                         Medical Record Number (MRN) *
                       </label>
@@ -425,7 +482,7 @@ export default function NewCarePlanPage() {
                         <input
                           {...register("patient.mrn")}
                           className={cn(
-                            "w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all pr-12",
+                            "w-full px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all pr-12",
                             errors.patient?.mrn &&
                               "border-red-300 focus:ring-red-400"
                           )}
@@ -435,7 +492,7 @@ export default function NewCarePlanPage() {
                         />
                         {checkingMRN && (
                           <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                            <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                            <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
                           </div>
                         )}
                       </div>
@@ -459,29 +516,29 @@ export default function NewCarePlanPage() {
 
                 {/* Step 2: Provider Information */}
                 {currentStep === 2 && (
-                  <div className="p-8">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                        <Stethoscope className="w-5 h-5 text-blue-600" />
+                  <div className="p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <Stethoscope className="w-4 h-4 text-blue-600" />
                       </div>
                       <div>
-                        <h2 className="text-2xl font-bold text-gray-900">
+                        <h2 className="text-xl font-bold text-gray-900">
                           Provider Information
                         </h2>
-                        <p className="text-gray-600">
+                        <p className="text-gray-600 text-sm">
                           Enter the healthcare provider's details
                         </p>
                       </div>
                     </div>
 
-                    <div className="space-y-6">
+                    <div className="space-y-4">
                       <div className="space-y-2">
                         <label className="block text-sm font-medium text-gray-700">
                           Provider Name *
                         </label>
                         <input
                           {...register("provider.providerName")}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                           placeholder="Dr. Sarah Johnson"
                         />
                         {errors.provider?.providerName && (
@@ -499,7 +556,7 @@ export default function NewCarePlanPage() {
                           <input
                             {...register("provider.providerNPI")}
                             className={cn(
-                              "w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all pr-12",
+                              "w-full px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all pr-12",
                               errors.provider?.providerNPI &&
                                 "border-red-300 focus:ring-red-400"
                             )}
@@ -509,7 +566,7 @@ export default function NewCarePlanPage() {
                           />
                           {checkingNPI && (
                             <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                              <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                              <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
                             </div>
                           )}
                         </div>
@@ -534,29 +591,29 @@ export default function NewCarePlanPage() {
 
                 {/* Step 3: Diagnosis & Medications */}
                 {currentStep === 3 && (
-                  <div className="p-8">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                        <FileText className="w-5 h-5 text-blue-600" />
+                  <div className="p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <FileText className="w-4 h-4 text-blue-600" />
                       </div>
                       <div>
-                        <h2 className="text-2xl font-bold text-gray-900">
+                        <h2 className="text-xl font-bold text-gray-900">
                           Diagnosis & Medications
                         </h2>
-                        <p className="text-gray-600">
+                        <p className="text-gray-600 text-sm">
                           Enter medical diagnosis and medication details
                         </p>
                       </div>
                     </div>
 
-                    <div className="space-y-6">
+                    <div className="space-y-4">
                       <div className="space-y-2">
                         <label className="block text-sm font-medium text-gray-700">
                           Primary Diagnosis (ICD-10) *
                         </label>
                         <input
                           {...register("diagnosis.primaryDiagnosis")}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                           placeholder="E11.9 - Type 2 diabetes mellitus without complications"
                         />
                         {errors.diagnosis?.primaryDiagnosis && (
@@ -570,32 +627,32 @@ export default function NewCarePlanPage() {
                         <label className="block text-sm font-medium text-gray-700">
                           Additional Diagnoses
                         </label>
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                           {(
                             watchedValues.diagnosis?.additionalDiagnoses || []
                           ).map((diagnosis, index) => (
-                            <div key={index} className="flex gap-3">
+                            <div key={index} className="flex gap-2">
                               <input
                                 value={diagnosis}
                                 onChange={(e) =>
                                   updateDiagnosis(index, e.target.value)
                                 }
-                                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                 placeholder="Additional ICD-10 code"
                               />
                               <button
                                 type="button"
                                 onClick={() => removeDiagnosis(index)}
-                                className="px-3 py-3 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                className="px-2 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                               >
-                                <X className="w-5 h-5" />
+                                <X className="w-4 h-4" />
                               </button>
                             </div>
                           ))}
                           <button
                             type="button"
                             onClick={addDiagnosis}
-                            className="flex items-center gap-2 text-blue-600 hover:text-blue-700 text-sm font-medium py-2"
+                            className="flex items-center gap-2 text-blue-600 hover:text-blue-700 text-sm font-medium py-1"
                           >
                             <Plus className="w-4 h-4" />
                             Add Additional Diagnosis
@@ -607,11 +664,39 @@ export default function NewCarePlanPage() {
                         <label className="block text-sm font-medium text-gray-700">
                           Medication Name *
                         </label>
-                        <input
-                          {...register("diagnosis.medicationName")}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                          placeholder="Metformin 500mg"
-                        />
+                        <div className="flex gap-2">
+                          <input
+                            {...register("diagnosis.medicationName")}
+                            className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                            placeholder="Metformin 500mg"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleOrderDuplicateCheck}
+                            disabled={
+                              checkingOrder ||
+                              !watchedValues.patient?.mrn ||
+                              !watchedValues.diagnosis?.medicationName ||
+                              !watchedValues.diagnosis?.primaryDiagnosis
+                            }
+                            className={cn(
+                              "px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2",
+                              checkingOrder ||
+                                !watchedValues.patient?.mrn ||
+                                !watchedValues.diagnosis?.medicationName ||
+                                !watchedValues.diagnosis?.primaryDiagnosis
+                                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                : "bg-blue-600 text-white hover:bg-blue-700"
+                            )}
+                          >
+                            {checkingOrder ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <AlertCircle className="w-4 h-4" />
+                            )}
+                            Check Duplicates
+                          </button>
+                        </div>
                         {errors.diagnosis?.medicationName && (
                           <p className="text-sm text-red-600 mt-1">
                             {errors.diagnosis.medicationName.message}
@@ -623,32 +708,32 @@ export default function NewCarePlanPage() {
                         <label className="block text-sm font-medium text-gray-700">
                           Medication History
                         </label>
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                           {(
                             watchedValues.diagnosis?.medicationHistory || []
                           ).map((medication, index) => (
-                            <div key={index} className="flex gap-3">
+                            <div key={index} className="flex gap-2">
                               <input
                                 value={medication}
                                 onChange={(e) =>
                                   updateMedicationHistory(index, e.target.value)
                                 }
-                                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                 placeholder="Previous medication"
                               />
                               <button
                                 type="button"
                                 onClick={() => removeMedicationHistory(index)}
-                                className="px-3 py-3 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                className="px-2 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                               >
-                                <X className="w-5 h-5" />
+                                <X className="w-4 h-4" />
                               </button>
                             </div>
                           ))}
                           <button
                             type="button"
                             onClick={addMedicationHistory}
-                            className="flex items-center gap-2 text-blue-600 hover:text-blue-700 text-sm font-medium py-2"
+                            className="flex items-center gap-2 text-blue-600 hover:text-blue-700 text-sm font-medium py-1"
                           >
                             <Plus className="w-4 h-4" />
                             Add Medication History
@@ -656,34 +741,40 @@ export default function NewCarePlanPage() {
                         </div>
                       </div>
                     </div>
+
+                    <WarningBanner
+                      message="A duplicate order exists for this patient, medication, and diagnosis combination. Please verify this is not a duplicate entry."
+                      show={showOrderWarning}
+                      onDismiss={() => setShowOrderWarning(false)}
+                    />
                   </div>
                 )}
 
                 {/* Step 4: Patient Records */}
                 {currentStep === 4 && (
-                  <div className="p-8">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                        <Upload className="w-5 h-5 text-blue-600" />
+                  <div className="p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <Upload className="w-4 h-4 text-blue-600" />
                       </div>
                       <div>
-                        <h2 className="text-2xl font-bold text-gray-900">
+                        <h2 className="text-xl font-bold text-gray-900">
                           Patient Records
                         </h2>
-                        <p className="text-gray-600">
+                        <p className="text-gray-600 text-sm">
                           Upload records or paste clinical notes
                         </p>
                       </div>
                     </div>
 
-                    <div className="space-y-6">
+                    <div className="space-y-4">
                       <div className="space-y-2">
                         <label className="block text-sm font-medium text-gray-700">
                           Clinical Notes
                         </label>
                         <textarea
                           {...register("records.patientRecords")}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all min-h-[120px] resize-y"
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all min-h-[100px] resize-y"
                           placeholder="Paste clinical notes, lab results, or other relevant patient information here..."
                         />
                         {errors.records?.patientRecords && (
@@ -708,7 +799,7 @@ export default function NewCarePlanPage() {
                 )}
 
                 {/* Navigation Buttons */}
-                <div className="bg-gray-50 px-8 py-6 flex justify-between items-center">
+                <div className="bg-gray-50 px-6 py-4 flex justify-between items-center">
                   <button
                     type="button"
                     onClick={prevStep}
@@ -792,20 +883,20 @@ export default function NewCarePlanPage() {
 
           {/* Preview Sidebar */}
           <div className="lg:col-span-1">
-            <div className="sticky top-8">
+            <div className="sticky top-6">
               {showPreview && (
-                <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-4">
+                  <h3 className="text-base font-semibold text-gray-900 mb-3">
                     Form Preview
                   </h3>
 
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {/* Patient Info Preview */}
-                    <div className="border-l-4 border-blue-500 pl-4">
-                      <h4 className="font-medium text-gray-900">
+                    <div className="border-l-4 border-blue-500 pl-3">
+                      <h4 className="font-medium text-gray-900 text-sm">
                         Patient Information
                       </h4>
-                      <div className="text-sm text-gray-600 mt-1">
+                      <div className="text-xs text-gray-600 mt-1">
                         {watchedValues.patient?.firstName &&
                         watchedValues.patient?.lastName ? (
                           <p>
@@ -822,11 +913,11 @@ export default function NewCarePlanPage() {
                     </div>
 
                     {/* Provider Info Preview */}
-                    <div className="border-l-4 border-green-500 pl-4">
-                      <h4 className="font-medium text-gray-900">
+                    <div className="border-l-4 border-green-500 pl-3">
+                      <h4 className="font-medium text-gray-900 text-sm">
                         Provider Information
                       </h4>
-                      <div className="text-sm text-gray-600 mt-1">
+                      <div className="text-xs text-gray-600 mt-1">
                         {watchedValues.provider?.providerName ? (
                           <p>{watchedValues.provider.providerName}</p>
                         ) : (
@@ -839,11 +930,11 @@ export default function NewCarePlanPage() {
                     </div>
 
                     {/* Diagnosis Preview */}
-                    <div className="border-l-4 border-purple-500 pl-4">
-                      <h4 className="font-medium text-gray-900">
+                    <div className="border-l-4 border-purple-500 pl-3">
+                      <h4 className="font-medium text-gray-900 text-sm">
                         Diagnosis & Medications
                       </h4>
-                      <div className="text-sm text-gray-600 mt-1">
+                      <div className="text-xs text-gray-600 mt-1">
                         {watchedValues.diagnosis?.primaryDiagnosis ? (
                           <p>
                             Primary: {watchedValues.diagnosis.primaryDiagnosis}
@@ -860,11 +951,11 @@ export default function NewCarePlanPage() {
                     </div>
 
                     {/* Records Preview */}
-                    <div className="border-l-4 border-orange-500 pl-4">
-                      <h4 className="font-medium text-gray-900">
+                    <div className="border-l-4 border-orange-500 pl-3">
+                      <h4 className="font-medium text-gray-900 text-sm">
                         Patient Records
                       </h4>
-                      <div className="text-sm text-gray-600 mt-1">
+                      <div className="text-xs text-gray-600 mt-1">
                         {watchedValues.records?.patientRecords ? (
                           <p className="text-green-600">
                             Clinical notes provided
@@ -877,8 +968,8 @@ export default function NewCarePlanPage() {
                   </div>
 
                   {/* Progress Summary */}
-                  <div className="mt-6 pt-4 border-t border-gray-200">
-                    <div className="flex items-center justify-between text-sm">
+                  <div className="mt-4 pt-3 border-t border-gray-200">
+                    <div className="flex items-center justify-between text-xs">
                       <span className="text-gray-600">Form Completion</span>
                       <span className="font-medium text-gray-900">
                         {Math.round(
@@ -899,9 +990,9 @@ export default function NewCarePlanPage() {
                         %
                       </span>
                     </div>
-                    <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
+                    <div className="mt-1 w-full bg-gray-200 rounded-full h-1.5">
                       <div
-                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
                         style={{
                           width: `${
                             (Object.keys(watchedValues).filter(
@@ -926,7 +1017,7 @@ export default function NewCarePlanPage() {
               )}
 
               {/* Step Navigation */}
-              <div className="mt-6 bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+              <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">
                   Quick Navigation
                 </h3>

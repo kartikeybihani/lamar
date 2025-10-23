@@ -16,7 +16,11 @@ import {
 } from "lucide-react";
 
 import { GeneratedCarePlan } from "@/types";
-import { downloadTextFile, formatDateTime } from "@/lib/utils";
+import {
+  downloadTextFile,
+  formatDateTime,
+  formatTextWithBold,
+} from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 export default function ResultPage() {
@@ -168,9 +172,12 @@ export default function ResultPage() {
           </div>
 
           <div className="bg-white border border-gray-200 rounded-lg p-6 max-h-96 overflow-y-auto">
-            <pre className="whitespace-pre-wrap text-sm text-gray-800 font-mono leading-relaxed">
-              {carePlan.carePlanText}
-            </pre>
+            <div
+              className="whitespace-pre-wrap text-sm text-gray-800 font-mono leading-relaxed"
+              dangerouslySetInnerHTML={{
+                __html: formatTextWithBold(carePlan.carePlanText),
+              }}
+            />
           </div>
         </div>
 

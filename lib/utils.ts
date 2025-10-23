@@ -59,3 +59,11 @@ export function isValidFileType(file: File, allowedTypes: string[]): boolean {
 export function generateId(): string {
   return Math.random().toString(36).substr(2, 9);
 }
+
+// Format text with asterisk-based bold formatting
+export function formatTextWithBold(text: string): string {
+  // Handle both single asterisk (*text*) and double asterisk (**text**) patterns
+  return text
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>') // Double asterisks for bold
+    .replace(/\*([^*]+)\*/g, '<strong>$1</strong>'); // Single asterisk for bold
+}

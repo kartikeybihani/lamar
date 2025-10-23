@@ -20,7 +20,7 @@ export default function Home() {
               <span className="block text-blue-600">Care Plan Generator</span>
             </h1>
             <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-              Automate pharmacist care plans in minutes using patient records.
+              Automate pharmacist care plans in seconds using patient records.
               Generate comprehensive, AI-powered care plans with duplicate
               detection and validation.
             </p>
@@ -66,7 +66,7 @@ export default function Home() {
                 Automated Generation
               </h3>
               <p className="text-gray-600">
-                Generate comprehensive care plans in minutes using AI-powered
+                Generate comprehensive care plans in seconds using AI-powered
                 analysis of patient data.
               </p>
             </div>

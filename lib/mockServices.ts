@@ -20,6 +20,22 @@ export const checkDuplicateProvider = async (npi: string): Promise<boolean> => {
   return data.isDuplicate;
 };
 
+// Check if order already exists (same patient + medication + diagnosis)
+export const checkDuplicateOrder = async (
+  mrn: string,
+  medicationName: string,
+  primaryDiagnosis: string
+): Promise<boolean> => {
+  const response = await fetch(
+    `/api/duplicates/order?mrn=${mrn}&medicationName=${encodeURIComponent(medicationName)}&primaryDiagnosis=${encodeURIComponent(primaryDiagnosis)}`
+  );
+  if (!response.ok) {
+    throw new Error('Failed to check order duplicate');
+  }
+  const data: DuplicateCheckResponse = await response.json();
+  return data.isDuplicate;
+};
+
 // Generate care plan using API
 export const generateCarePlan = async (formData: CarePlanFormData): Promise<GeneratedCarePlan> => {
   const response = await fetch('/api/care-plans', {
