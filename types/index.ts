@@ -17,8 +17,8 @@ export interface DiagnosisInfo {
 }
 
 export interface PatientRecords {
-  patientRecords: string; // text
-  patientFile: File | null; // optional PDF
+  patientRecords?: string; // text
+  patientFile?: File | null; // optional PDF
 }
 
 export interface CarePlanFormData {

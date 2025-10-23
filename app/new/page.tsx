@@ -34,7 +34,7 @@ export default function NewCarePlanPage() {
     setError,
     clearErrors,
     formState: { errors, isValid },
-  } = useForm<CarePlanFormData>({
+  } = useForm({
     resolver: zodResolver(carePlanFormSchema),
     mode: "onChange",
   });
