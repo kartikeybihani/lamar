@@ -154,6 +154,28 @@ body {
   @apply text-gray-600 hover:text-gray-900 hover:bg-gray-100 px-3 py-2 rounded-lg font-medium transition-all duration-200;
 }
 
+/* Highlighting styles for care plan text */
+.highlight-section {
+  background-color: #fef3c7 !important;
+  border: 1px solid #fbbf24 !important;
+  border-radius: 6px !important;
+  padding: 4px 8px !important;
+  font-weight: 600 !important;
+  transition: all 0.3s ease !important;
+  display: inline !important;
+}
+
+.highlight-statement {
+  background-color: #fef3c7 !important;
+  border: 1px solid #fbbf24 !important;
+  border-radius: 6px !important;
+  padding: 4px 8px !important;
+  font-weight: 600 !important;
+  transition: all 0.3s ease !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+  display: inline !important;
+}
+
 /* Print styles */
 @media print {
   .print\:hidden {

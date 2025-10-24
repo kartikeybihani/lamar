@@ -250,18 +250,6 @@ Status: ${reportData.isFinal ? "Final" : "Draft"}`;
       "<strong>$1</strong>"
     );
 
-    // Add a simple test highlight to verify CSS is working
-    if (
-      highlightedSection === "Problem List" &&
-      highlightedStatement === "Patient has diabetes"
-    ) {
-      formattedText = formattedText.replace(
-        /(diabetes|diabetic|glucose|blood sugar)/gi,
-        '<span class="highlight-statement">$1</span>'
-      );
-      console.log("Test highlight applied");
-    }
-
     // Add highlighting based on selected section and statement
     if (highlightedSection && reportData?.sourceAttribution) {
       console.log("Highlighting section:", highlightedSection);
@@ -314,41 +302,65 @@ Status: ${reportData.isFinal ? "Final" : "Draft"}`;
               );
               console.log("Clean match found and highlighted");
             } else {
-              // Try partial matching with key phrases
-              const keyPhrases = cleanStatement
-                .split(/[,;.]/)
-                .filter((phrase) => phrase.trim().length > 5);
-              console.log("Key phrases:", keyPhrases);
+              // Try to find the line containing the statement
+              const lines = formattedText.split("<br>");
+              let foundLine = false;
 
-              keyPhrases.forEach((phrase) => {
-                const trimmedPhrase = phrase.trim();
-                if (trimmedPhrase && formattedText.includes(trimmedPhrase)) {
-                  const escapedPhrase = trimmedPhrase.replace(
-                    /[.*+?^${}()|[\]\\]/g,
-                    "\\$&"
-                  );
-                  formattedText = formattedText.replace(
-                    new RegExp(`(${escapedPhrase})`, "gi"),
-                    '<span class="highlight-statement">$1</span>'
-                  );
-                  console.log("Phrase matched:", trimmedPhrase);
-                }
-              });
+              for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                // Check if this line contains the statement or key parts of it
+                const statementWords = cleanStatement
+                  .toLowerCase()
+                  .split(" ")
+                  .filter((word) => word.length > 3);
+                const lineWords = line.toLowerCase().split(" ");
 
-              // Fallback to word matching
-              const words = cleanStatement
-                .split(" ")
-                .filter((word) => word.length > 4);
-              console.log("Trying word matching with:", words);
-
-              words.forEach((word) => {
-                const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-                formattedText = formattedText.replace(
-                  new RegExp(`(${escapedWord})`, "gi"),
-                  '<span class="highlight-statement">$1</span>'
+                // Count how many statement words are found in this line
+                const matchingWords = statementWords.filter((statementWord) =>
+                  lineWords.some((lineWord) => lineWord.includes(statementWord))
                 );
-              });
-              console.log("Partial matching applied");
+
+                // If we have a good match (at least 3 words or 50% of statement words)
+                if (
+                  matchingWords.length >=
+                  Math.min(3, Math.ceil(statementWords.length * 0.5))
+                ) {
+                  console.log(
+                    "Found matching line:",
+                    line.substring(0, 100) + "..."
+                  );
+                  lines[i] = `<span class="highlight-statement">${line}</span>`;
+                  foundLine = true;
+                  break;
+                }
+              }
+
+              if (foundLine) {
+                formattedText = lines.join("<br>");
+                console.log("Line highlighting applied");
+              } else {
+                // Fallback to phrase matching if line matching fails
+                const keyPhrases = cleanStatement
+                  .split(/[,;.]/)
+                  .filter((phrase) => phrase.trim().length > 5);
+                console.log("Key phrases:", keyPhrases);
+
+                keyPhrases.forEach((phrase) => {
+                  const trimmedPhrase = phrase.trim();
+                  if (trimmedPhrase && formattedText.includes(trimmedPhrase)) {
+                    const escapedPhrase = trimmedPhrase.replace(
+                      /[.*+?^${}()|[\]\\]/g,
+                      "\\$&"
+                    );
+                    formattedText = formattedText.replace(
+                      new RegExp(`(${escapedPhrase})`, "gi"),
+                      '<span class="highlight-statement">$1</span>'
+                    );
+                    console.log("Phrase matched:", trimmedPhrase);
+                  }
+                });
+                console.log("Fallback phrase matching applied");
+              }
             }
           }
         } else {
@@ -742,39 +754,8 @@ Status: ${reportData.isFinal ? "Final" : "Draft"}`;
                     {showSources ? "Hide Sources" : "View Sources"}
                   </button>
                 )}
-                {/* Debug button - remove this later */}
-                <button
-                  onClick={() => {
-                    setHighlightedSection("Problem List");
-                    setHighlightedStatement("Patient has diabetes");
-                  }}
-                  className="btn-secondary flex items-center gap-2 text-sm"
-                >
-                  Test Highlight
-                </button>
               </div>
               <div className="bg-gray-50 rounded-lg p-6 print:bg-white print:border flex-1 flex flex-col">
-                <style jsx>{`
-                  .highlight-section {
-                    background-color: #fef3c7 !important;
-                    border: 2px solid #f59e0b !important;
-                    border-radius: 4px !important;
-                    padding: 2px 4px !important;
-                    font-weight: 600 !important;
-                    transition: all 0.3s ease !important;
-                    display: inline !important;
-                  }
-                  .highlight-statement {
-                    background-color: #fbbf24 !important;
-                    border: 2px solid #d97706 !important;
-                    border-radius: 4px !important;
-                    padding: 2px 4px !important;
-                    font-weight: 700 !important;
-                    transition: all 0.3s ease !important;
-                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
-                    display: inline !important;
-                  }
-                `}</style>
                 <div
                   key={`${highlightedSection}-${highlightedStatement}`}
                   className="text-gray-900 text-sm leading-relaxed flex-1 overflow-y-auto prose prose-sm max-w-none"
@@ -782,6 +763,11 @@ Status: ${reportData.isFinal ? "Final" : "Draft"}`;
                     __html: formatCarePlanText(reportData.carePlanText),
                   }}
                 />
+                {/* Debug: Show current highlighting state */}
+                <div className="mt-2 p-2 bg-gray-100 text-xs text-gray-600">
+                  Debug: Section="{highlightedSection}", Statement="
+                  {highlightedStatement}"
+                </div>
                 <div className="mt-4 pt-4 border-t border-gray-200 text-sm text-gray-500 flex flex-wrap gap-4">
                   <p>Generated by: {reportData.generatedBy}</p>
                   <p>Generated on: {formatDateTime(reportData.generatedAt)}</p>
