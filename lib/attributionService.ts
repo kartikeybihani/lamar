@@ -85,7 +85,7 @@ const generateAttributionWithChunking = async (
             { role: 'user', content: userPrompt }
           ],
           temperature: 0.1,
-          max_tokens: 3000 // Reasonable for chunks
+          max_tokens: 4000 // Reasonable for chunks
         })
       });
 
@@ -184,7 +184,7 @@ export const generateSourceAttribution = async (
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.1,
-        max_tokens: 6000 // Back to 6000 to avoid hitting limits
+        max_tokens: 7000 // Back to 7000 to avoid hitting limits
       })
     });
 
